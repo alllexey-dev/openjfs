@@ -1,4 +1,4 @@
-package me.alllexey123.openjfs.controllers;
+package dev.alllexey.openjfs.controllers;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;

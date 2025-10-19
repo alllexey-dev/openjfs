@@ -1,14 +1,16 @@
-package me.alllexey123.openjfs.model;
+package dev.alllexey.openjfs.model;
 
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class RegularFileInfo implements FileInfo {
+public class DirectoryInfo implements FileInfo {
 
     private String path;
 
@@ -20,8 +22,10 @@ public class RegularFileInfo implements FileInfo {
 
     @Override
     public FileType getType() {
-        return FileType.REGULAR_FILE;
+        return FileType.DIRECTORY;
     }
 
-    private long size;
+    private boolean isEmpty;
+
+    private List<FileInfo> files = new ArrayList<>();
 }

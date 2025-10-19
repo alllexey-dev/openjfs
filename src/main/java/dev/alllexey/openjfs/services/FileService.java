@@ -1,10 +1,10 @@
-package me.alllexey123.openjfs.services;
+package dev.alllexey.openjfs.services;
 
 import lombok.RequiredArgsConstructor;
-import me.alllexey123.openjfs.configuration.MainConfigurationProperties;
-import me.alllexey123.openjfs.model.DirectoryInfo;
-import me.alllexey123.openjfs.model.FileInfo;
-import me.alllexey123.openjfs.model.RegularFileInfo;
+import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
+import dev.alllexey.openjfs.model.DirectoryInfo;
+import dev.alllexey.openjfs.model.FileInfo;
+import dev.alllexey.openjfs.model.RegularFileInfo;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;

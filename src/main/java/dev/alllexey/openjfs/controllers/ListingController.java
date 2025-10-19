@@ -1,8 +1,8 @@
-package me.alllexey123.openjfs.controllers;
+package dev.alllexey.openjfs.controllers;
 
 import lombok.RequiredArgsConstructor;
-import me.alllexey123.openjfs.model.FileInfo;
-import me.alllexey123.openjfs.services.FileService;
+import dev.alllexey.openjfs.model.FileInfo;
+import dev.alllexey.openjfs.services.FileService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;

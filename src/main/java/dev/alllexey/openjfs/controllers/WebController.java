@@ -1,7 +1,7 @@
-package me.alllexey123.openjfs.controllers;
+package dev.alllexey.openjfs.controllers;
 
 import lombok.RequiredArgsConstructor;
-import me.alllexey123.openjfs.configuration.MainConfigurationProperties;
+import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;

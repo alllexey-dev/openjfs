@@ -1,4 +1,4 @@
-package me.alllexey123.openjfs.model;
+package dev.alllexey.openjfs.model;
 
 public enum FileType {
     REGULAR_FILE,

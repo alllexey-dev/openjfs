@@ -7,12 +7,12 @@
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>3.5.4</version>
 	</parent>
-	<groupId>me.alllexey123</groupId>
+	<groupId>dev.alllexey</groupId>
 	<artifactId>openjfs</artifactId>
 	<version>1.1.0</version>
 	<name>openjfs</name>
 	<description>Open Java File Server (based on Spring Boot)</description>
-	<url>https://github.com/alllexey123/openjfs</url>
+	<url>https://github.com/alllexey-dev/openjfs</url>
 	<licenses>
 		<license>
 			<name>MIT License</name>
@@ -22,8 +22,8 @@
 	<developers>
 		<developer>
 			<name>Aleksey Makarov</name>
-			<organization>io.github.alllexey123</organization>
-			<organizationUrl>https://github.com/alllexey123</organizationUrl>
+			<organization>dev.alllexey</organization>
+			<organizationUrl>https://github.com/alllexey-dev</organizationUrl>
 		</developer>
 	</developers>
 	<scm>

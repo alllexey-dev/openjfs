@@ -1,4 +1,4 @@
-package me.alllexey123.openjfs.configuration;
+package dev.alllexey.openjfs.configuration;
 
 import lombok.Getter;
 import lombok.Setter;
