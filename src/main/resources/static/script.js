@@ -94,10 +94,6 @@ function updateTopbarPath(file) {
     let splitPath = fullPath.split('/');
     let pathBuffer = '';
 
-    if (isDirectory(file)) {
-        splitPath = splitPath.slice(0, splitPath.length - 1);
-    }
-
     for (let pathSegmentStr of splitPath) {
         if (pathSegmentStr === '') continue;
         pathBuffer += pathSegmentStr + '/';
