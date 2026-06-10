@@ -200,7 +200,7 @@ public class FileService {
                 // skip if hidden or in hidden dir (and hidden files are disabled)
                 Stream<Path> filteredWalk = properties.isAllowHidden()
                         ? walk
-                        : walk.filter(path -> isHiddenRelative(path, dirPath));
+                        : walk.filter(path -> !isHiddenRelative(path, dirPath));
 
                 filteredWalk.forEach(path -> {
                     try {
