@@ -5,30 +5,57 @@ const fileList = document.querySelector('.file-list');
 const topbarPath = document.querySelector('.topbar-path');
 const topbarDownload = document.querySelector('.topbar-download');
 
-let path = window.location.pathname.substring(4);
-updateData(path);
+// paths are kept decoded (as returned by the API) and encoded only when building URLs
+const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');
+
+const decodePath = (path) => {
+    try {
+        return decodeURIComponent(path);
+    } catch (e) {
+        return path; // malformed escape sequence typed by hand
+    }
+};
+
+const currentWindowPath = () => decodePath(window.location.pathname.substring(4));
+
+let currentRequest = null;
+
+updateData(currentWindowPath());
 
 window.addEventListener('popstate', (event) => {
-    if (event.state && event.state.path) {
-        const newPath = event.state.path.substring(4);
-        updateData(newPath);
-    } else {
-        const initialPath = window.location.pathname.substring(4);
-        updateData(initialPath);
-    }
+    updateData(event.state?.path ?? currentWindowPath());
 });
 
 
 function updateData(path) {
-    fetch(`/list/${path}`)
-        .then((response) => response.json())
+    // drop the previous navigation, otherwise a slow response may overwrite the newer one
+    currentRequest?.abort();
+    const request = new AbortController();
+    currentRequest = request;
+
+    fetch(`/list/${encodePath(path)}`, {signal: request.signal})
+        .then((response) => {
+            if (!response.ok) throw new Error(`${response.status}`);
+            return response.json();
+        })
         .then((data) => {
-            updateContent(data)
+            updateContent(data, request.signal)
             updateTopbar(data)
+        })
+        .catch((error) => {
+            if (error.name === 'AbortError') return;
+            showError(error.message);
         });
 }
 
-function updateContent(file) {
+function showError(status) {
+    fileList.innerHTML = '';
+    fileContentWrapper.classList.remove('hidden');
+    fileContent.classList.add('hidden');
+    fileContentTitle.textContent = status === '404' ? 'Not found.' : `Failed to load (${status}).`;
+}
+
+function updateContent(file, signal) {
     fileContentWrapper.classList.toggle('hidden', isDirectory(file));
 
     if (isDirectory(file)) {
@@ -39,12 +66,20 @@ function updateContent(file) {
         updateFileContent('');
     } else {
         if (file['size'] <= 128 * 1024) { // max 128KB
-            fetch(`/text/${file['path'] + file['name']}`)
-                .then(value => value.text())
+            fetch(`/text/${encodePath(file['path'] + file['name'])}`, {signal})
+                .then(response => {
+                    if (!response.ok) throw new Error(`${response.status}`);
+                    return response.text();
+                })
                 .then(text => {
                     fileContent.classList.remove('hidden');
                     fileContentTitle.textContent = 'File contents:';
                     updateFileContent(text)
+                })
+                .catch((error) => {
+                    if (error.name === 'AbortError') return;
+                    fileContent.classList.add('hidden');
+                    fileContentTitle.textContent = `Failed to load file contents (${error.message}).`;
                 });
         } else {
             fileContentTitle.textContent = 'File is too huge to display.'
@@ -59,8 +94,7 @@ function updateFileList(files) {
     fileList.innerHTML = '';
 
     sortFileList(files);
-    for (let fileKey in files) {
-        let file = files[fileKey];
+    for (let file of files) {
         let listItem = createListItem(file);
         fileList.appendChild(listItem);
     }
@@ -104,7 +138,8 @@ function updateTopbarPath(file) {
         arrow.alt = 'arrow';
 
         let a = document.createElement('a');
-        a.href = '/ui/' + pathBuffer;
+        a.href = '/ui/' + encodePath(pathBuffer);
+        a.dataset.path = pathBuffer;
         a.text = pathSegmentStr;
         addLinkListener(a);
 
@@ -120,24 +155,24 @@ function updateTopbarButtons(file) {
 function addLinkListener(a) {
     a.addEventListener('click', (event) => {
         event.preventDefault();
-        const newPath = a.getAttribute('href').substring(4);
+        const newPath = a.dataset.path ?? '';
         updateData(newPath);
         updateWindowPath(newPath);
     });
 }
 
 function updateWindowPath(path) {
-    const newUrl = `/ui/${path}`;
-    window.history.pushState({path: newUrl}, '', newUrl);
+    const newUrl = `/ui/${encodePath(path)}`;
+    window.history.pushState({path}, '', newUrl);
 }
 
 function createListItem(file) {
     let isDir = isDirectory(file);
     let fileName = file['name'];
-    let fileLastModifiedRaw = file['lastModified'];
+    let fileLastModifiedMillis = file['lastModifiedMillis'];
     let path = file['path'];
-    let fileLastModified = fileLastModifiedRaw === null ? '—' : formatDate(fileLastModifiedRaw);
-    let fileSize = !isDir ? formatBytes(file['size']) : '—';
+    let fileLastModified = fileLastModifiedMillis < 0 ? '—' : formatDate(fileLastModifiedMillis);
+    let fileSize = !isDir && file['size'] >= 0 ? formatBytes(file['size']) : '—';
 
     const listItem = document.createElement('div');
     listItem.classList.add('file-row');
@@ -188,13 +223,13 @@ function createListItem(file) {
     }
     linkButton.onclick = (e) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(window.location.origin + '/' + path + fileName)
+        navigator.clipboard.writeText(window.location.origin + '/ui/' + encodePath(path + fileName))
     }
     downloadButton.onclick = (e) => {
 
         e.stopPropagation();
         if (isDir && !allowDownloadDirs) return;
-        window.location.pathname = '/direct/' + path + fileName;
+        window.location.href = '/direct/' + encodePath(path + fileName);
     }
 
     if (fileName.startsWith('.')) {
@@ -315,8 +350,8 @@ const getFileExtension = (filename) => {
     return filename.substring(lastDotIndex + 1).toLowerCase();
 };
 
-const formatDate = (dateString) => {
-    const date = new Date(dateString);
+const formatDate = (millis) => {
+    const date = new Date(millis);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const month = months[date.getMonth()];
     const day = date.getDate();

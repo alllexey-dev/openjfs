@@ -3,6 +3,11 @@ package dev.alllexey.openjfs.controllers;
 import lombok.RequiredArgsConstructor;
 import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import dev.alllexey.openjfs.services.FileService;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -11,9 +16,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -27,7 +32,7 @@ public class DirectController {
     private final FileService fileService;
 
     @GetMapping("/{*path}")
-    public ResponseEntity<StreamingResponseBody> directDownload(@PathVariable String path) throws IOException {
+    public ResponseEntity<Resource> directDownload(@PathVariable String path, HttpServletResponse response) throws IOException {
         Path fullPath = fileService.resolveRequestedPath(path);
 
         HttpStatusCode accessCheck = fileService.checkAccess(fullPath);
@@ -42,28 +47,29 @@ public class DirectController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
 
-            StreamingResponseBody zipStream = fileService.zipDirectory(fullPath);
-
-            return ResponseEntity.ok()
-                    .header("Content-Disposition", "attachment; filename=\"%s.zip\"".formatted(filename))
-                    .contentType(new MediaType("application", "zip"))
-                    .body(zipStream);
+            // archive size is unknown in advance, so it is written straight into the response
+            response.setContentType("application/zip");
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, attachment(filename + ".zip"));
+            fileService.zipDirectory(fullPath, response.getOutputStream());
+            return null; // response is already written
         }
 
         if (Files.isRegularFile(fullPath)) {
-            StreamingResponseBody stream = outputStream -> {
-                try (InputStream inputStream = Files.newInputStream(fullPath)) {
-                    inputStream.transferTo(outputStream);
-                }
-            };
-
+            // Resource body gives Range (resume, seeking) and conditional requests support
             return ResponseEntity.ok()
-                    .contentLength(Files.size(fullPath))
-                    .header("Content-Disposition", "attachment; filename=\"%s\"".formatted(filename))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, attachment(filename))
+                    .lastModified(Files.getLastModifiedTime(fullPath).toMillis())
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(stream);
+                    .body(new FileSystemResource(fullPath));
         }
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // should not happen
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // special files (sockets, pipes, devices)
+    }
+
+    private static String attachment(String filename) {
+        return ContentDisposition.attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build()
+                .toString();
     }
 }

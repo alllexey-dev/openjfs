@@ -20,6 +20,8 @@ public class SearchController {
 
     @GetMapping("/{*path}")
     public ResponseEntity<List<FileInfo>> search(@PathVariable String path, @RequestParam("q") String query) {
+        if (query.isBlank()) return ResponseEntity.badRequest().build();
+
         Path fullPath = fileService.resolveRequestedPath(path);
 
         HttpStatusCode accessCheck = fileService.checkAccess(fullPath);

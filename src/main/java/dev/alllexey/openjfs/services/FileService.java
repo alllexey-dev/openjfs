@@ -8,19 +8,29 @@ import dev.alllexey.openjfs.model.RegularFileInfo;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -29,13 +39,20 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class FileService {
 
+    // follow symlinks (loops are detected by walkFileTree), but never leave the data dir, see isAccessibleChild
+    private static final Set<FileVisitOption> WALK_OPTIONS = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+
     private final MainConfigurationProperties properties;
 
     public Path resolveRequestedPath(String requestedPath) {
         if (requestedPath.startsWith("/")) {
             requestedPath = requestedPath.substring(1);
         }
-        return getFullPath(Path.of(requestedPath));
+        try {
+            return getFullPath(Path.of(requestedPath));
+        } catch (InvalidPathException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid path: " + requestedPath, e);
+        }
     }
 
     public Path getFullPath(Path requestedPath) {
@@ -49,6 +66,8 @@ public class FileService {
         if (!Files.exists(fullPath)) return HttpStatus.NOT_FOUND;
         // 404 if hidden or in hidden dir (and hidden files are disabled)
         if (isHidden(fullPath) && !properties.isAllowHidden()) return HttpStatus.NOT_FOUND;
+        // 403 if it is (or is inside) a symlink pointing outside our data dir
+        if (!isRealPathInsideDataDir(fullPath)) return HttpStatus.FORBIDDEN;
         return HttpStatus.OK;
     }
 
@@ -56,13 +75,17 @@ public class FileService {
         return fullPath.startsWith(properties.getDataPathAsPath());
     }
 
-    // check if file is hidden or in hidden directory
-    public boolean isHidden(Path fullPath) {
-        return isHiddenRelative(fullPath, properties.getDataPathAsPath());
+    public boolean isRealPathInsideDataDir(Path fullPath) {
+        try {
+            return fullPath.toRealPath().startsWith(properties.getDataPathAsPath().toRealPath());
+        } catch (IOException e) {
+            return false; // broken symlink or no permissions
+        }
     }
 
-    private boolean isHiddenRelative(Path fullPath, Path basePath) {
-        Path relPath = basePath.relativize(fullPath);
+    // check if file is hidden or in hidden directory
+    public boolean isHidden(Path fullPath) {
+        Path relPath = properties.getDataPathAsPath().relativize(fullPath);
         for (Path segment : relPath) {
             if (isHiddenByName(segment)) {
                 return true;
@@ -75,12 +98,18 @@ public class FileService {
         return filePath.getFileName().toString().startsWith(".");
     }
 
+    // check a direct child of an accessible directory (parent dirs are already checked)
+    public boolean isAccessibleChild(Path path) {
+        if (isHiddenByName(path) && !properties.isAllowHidden()) return false;
+        return isRealPathInsideDataDir(path);
+    }
+
     // assume file (directory) exists and is accessible (visible, not outside, etc.)
     public FileInfo getFileInfo(Path fullPath, int depth) {
         if (depth < 0) return null; // should not happen
         Path relativize = properties.getDataPathAsPath().relativize(fullPath);
         Path parentPath = relativize.getParent();
-        String relPath = parentPath == null ? "" : (parentPath + "/");
+        String relPath = parentPath == null ? "" : (toSlashSeparated(parentPath) + "/");
         String name = relativize.toString().isEmpty() ? "" : fullPath.getFileName().toString();
         long lastModifiedMillis = -1;
         LocalDateTime lastModified = null;
@@ -108,32 +137,23 @@ public class FileService {
                     .build();
         } else if (Files.isDirectory(fullPath)) {
             List<FileInfo> files = new ArrayList<>();
-            boolean isEmpty = true;
+            boolean isEmpty;
             if (depth >= 1) {
                 try (Stream<Path> stream = Files.list(fullPath)) {
-                    stream.forEach(path -> {
-                        if (isHiddenByName(path) && !properties.isAllowHidden())
-                            return; // check by name because already parent dirs are checked
+                    stream.filter(this::isAccessibleChild).forEach(path -> {
                         FileInfo fi = getFileInfo(path, depth - 1);
                         if (fi == null) return;
                         files.add(fi);
                     });
-                } catch (IOException ignored) {
+                } catch (AccessDeniedException e) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No permissions to list " + fullPath, e);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to list directory " + fullPath, e);
                 }
 
                 isEmpty = files.isEmpty();
             } else {
-                if (properties.isAllowHidden()) {
-                    try {
-                        isEmpty = isEmpty(fullPath);
-                    } catch (IOException ignored) {
-                    }
-                } else {
-                    try {
-                        isEmpty = !containsNonHidden(fullPath);
-                    } catch (IOException ignored) {
-                    }
-                }
+                isEmpty = !hasAccessibleChildren(fullPath);
             }
 
             return DirectoryInfo.builder()
@@ -145,86 +165,113 @@ public class FileService {
                     .files(depth >= 1 ? files : null)
                     .build();
         } else {
-            return null; // should not happen
+            return null; // special files (sockets, pipes, devices) are not served
         }
     }
 
-    public boolean isEmpty(Path path) throws IOException {
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> entries = Files.list(path)) {
-                return entries.findFirst().isEmpty();
-            }
+    public boolean hasAccessibleChildren(Path path) {
+        try (Stream<Path> entries = Files.list(path)) {
+            return entries.anyMatch(this::isAccessibleChild);
+        } catch (IOException e) {
+            return false;
         }
-
-        return false;
-    }
-
-    public boolean containsNonHidden(Path path) throws IOException {
-        if (Files.isDirectory(path)) {
-            try (Stream<Path> entries = Files.list(path)) {
-                return entries.anyMatch(entry -> !isHiddenByName(entry));
-            }
-        }
-
-        return false;
     }
 
     // assume file (directory) exists and is accessible (visible, not outside, etc.)
     public List<FileInfo> simpleSearch(Path fullPath, String query) {
         final String queryLowerCase = query.toLowerCase();
-        try (Stream<Path> stream = Files.walk(fullPath)) {
-            List<FileInfo> files = new ArrayList<>();
-            stream.forEach(path -> {
-                if (isHiddenByName(path) && !properties.isAllowHidden()) return;
+        List<FileInfo> files = new ArrayList<>();
 
-                if (path.getFileName().toString().toLowerCase().contains(queryLowerCase)) {
-                    FileInfo fi = getFileInfo(path, 0);
-                    if (fi == null) return;
-                    files.add(fi);
+        try {
+            walkAccessible(fullPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (dir.equals(fullPath)) return FileVisitResult.CONTINUE;
+                    return addIfMatches(dir) ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    return addIfMatches(file) ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE;
+                }
+
+                // returns false when the result limit is reached
+                private boolean addIfMatches(Path path) {
+                    if (path.getFileName().toString().toLowerCase().contains(queryLowerCase)) {
+                        FileInfo fi = getFileInfo(path, 0);
+                        if (fi != null) files.add(fi);
+                    }
+                    return files.size() < properties.getSearchMaxResults();
                 }
             });
-            return files;
         } catch (IOException e) {
-            return null;
+            throw new UncheckedIOException("Failed to search in " + fullPath, e);
+        }
+
+        return files;
+    }
+
+    public void zipDirectory(Path dirPath, OutputStream outputStream) throws IOException {
+        try (ZipOutputStream zipOut = new ZipOutputStream(new BufferedOutputStream(outputStream))) {
+            zipOut.setLevel(properties.getZipCompressionLevel());
+
+            walkAccessible(dirPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(dirPath)) {
+                        zipOut.putNextEntry(new ZipEntry(toSlashSeparated(dirPath.relativize(dir)) + "/"));
+                        zipOut.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    // never read pipes or devices: reading a FIFO blocks forever
+                    if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+
+                    InputStream in;
+                    try {
+                        in = Files.newInputStream(file);
+                    } catch (IOException e) {
+                        return FileVisitResult.CONTINUE; // skip unreadable files instead of breaking the archive
+                    }
+
+                    try (in) {
+                        zipOut.putNextEntry(new ZipEntry(toSlashSeparated(dirPath.relativize(file))));
+                        in.transferTo(zipOut);
+                        zipOut.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         }
     }
 
-    public StreamingResponseBody zipDirectory(Path dirPath) {
-        return outputStream -> {
-            try (
-                    ZipOutputStream zipOut = new ZipOutputStream(new BufferedOutputStream(outputStream));
-                    Stream<Path> walk = Files.walk(dirPath)
-            ) {
-                zipOut.setLevel(properties.getZipCompressionLevel());
-
-                // skip if hidden or in hidden dir (and hidden files are disabled)
-                Stream<Path> filteredWalk = properties.isAllowHidden()
-                        ? walk
-                        : walk.filter(path -> !isHiddenRelative(path, dirPath));
-
-                filteredWalk.forEach(path -> {
-                    try {
-                        Path relPath = dirPath.relativize(path);
-
-                        if (Files.isDirectory(path)) {
-                            if (!relPath.toString().isEmpty()) {
-                                ZipEntry dirEntry = new ZipEntry(relPath + "/");
-                                zipOut.putNextEntry(dirEntry);
-                                zipOut.closeEntry();
-                            }
-                        } else {
-                            ZipEntry fileEntry = new ZipEntry(relPath.toString());
-                            zipOut.putNextEntry(fileEntry);
-                            try (InputStream in = Files.newInputStream(path)) {
-                                in.transferTo(zipOut);
-                            }
-                            zipOut.closeEntry();
-                        }
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
+    // walks the tree passing only accessible entries to the visitor;
+    // hidden (if disabled), escaping and unreadable entries are skipped
+    private void walkAccessible(Path start, SimpleFileVisitor<Path> visitor) throws IOException {
+        Files.walkFileTree(start, WALK_OPTIONS, Integer.MAX_VALUE, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (!dir.equals(start) && !isAccessibleChild(dir)) return FileVisitResult.SKIP_SUBTREE;
+                return visitor.preVisitDirectory(dir, attrs);
             }
-        };
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                if (!isAccessibleChild(file)) return FileVisitResult.CONTINUE;
+                return visitor.visitFile(file, attrs);
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                return FileVisitResult.CONTINUE; // no permissions, symlink loop, deleted during walk, etc.
+            }
+        });
+    }
+
+    private static String toSlashSeparated(Path path) {
+        return path.toString().replace(File.separatorChar, '/');
     }
 }

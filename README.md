@@ -4,7 +4,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 
 **This project's development has reached it's end of life because I have other cool ideas to work on.**
 
-**Symlinks are not officially supported (though they may work).**
+**Symlinks are followed only if they point inside `OPENJFS_DATA_PATH`; links pointing outside are not served.**
 ## Features
 
 *   **Directory Download (as ZIP):** Download entire directories as a single ZIP archive.
@@ -32,7 +32,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/alllexey123/openjfs
+    git clone https://github.com/alllexey-dev/openjfs
     cd openjfs
     ```
 
@@ -119,9 +119,10 @@ The file server is configured through environment variables.
 |---------------------------------|-----------------------------------------------------------------------------|-------------------|
 | `OPENJFS_DATA_PATH`             | The absolute path to the directory you want to serve files from.            | Current directory |
 | `OPENJFS_PORT`                  | The port for webserver to listen on.                                        | `8080`            |
-| `OPENJFS_ALLOW_HIDDEN`          | Set to `true` to allow access to hidden files and directories.              | `true`            |
+| `OPENJFS_ALLOW_HIDDEN`          | Set to `true` to allow access to hidden files and directories.              | `false`           |
 | `OPENJFS_ALLOW_ZIP_DIRECTORIES` | Set to `true` to enable downloading entire directories as a ZIP archive.    | `true`            |
 | `OPENJFS_ZIP_COMPRESSION_LEVEL` | The compression level for ZIP archives, from 0 (no compression) to 9 (max). | `1`               |
-| `OPENJFS_REQUEST_TIMEOUT`       | The request timeout (crucial for large file downloads).                     | `3600000`         |
+| `OPENJFS_SEARCH_MAX_RESULTS`    | The maximum number of search results.                                       | `1000`            |
+| `OPENJFS_WORKER_THREADS`        | The number of worker threads (limits simultaneous file downloads).          | `200`             |
 | `OPENJFS_SERVER_NAME`           | The server name to use as page title.                                       | `openjfs`         |
 

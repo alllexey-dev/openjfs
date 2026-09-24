@@ -1,15 +1,18 @@
 package dev.alllexey.openjfs.configuration;
 
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.validator.constraints.Range;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 import java.nio.file.Path;
 
 @Component
 @ConfigurationProperties(prefix = "openjfs")
+@Validated
 @Getter
 @Setter
 public class MainConfigurationProperties {
@@ -23,9 +26,12 @@ public class MainConfigurationProperties {
     @Range(min = 0, max = 9)
     private int zipCompressionLevel;
 
+    @Min(1)
+    private int searchMaxResults;
+
     private String serverName;
 
     public Path getDataPathAsPath() {
-        return Path.of(dataPath);
+        return Path.of(dataPath).toAbsolutePath().normalize();
     }
 }
