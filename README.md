@@ -10,6 +10,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 *   **Directory Download (as ZIP):** Download entire directories as a single ZIP archive.
 *   **Direct File Download:** Access and download individual files directly through a simple URL structure.
 *   **JSON File Lists and Search:** List or search your files (and get some basic data) using simple API.
+*   **Web UI:** Mobile-friendly file browser with search, sorting, dark theme and previews for images, video, audio, PDF and text files.
 
 ## Roadmap
 
@@ -62,6 +63,9 @@ Once running, you can access your files at `http://localhost:8080`.
 You can download your files using `http://localhost:8080/direct/path_to_your/file.ext`. Using `OPENJFS_ALLOW_ZIP_DIRECTORIES=true` will zip directories on the fly.
 
 For example, a file located at `${OPENJFS_DATA_PATH}/documents/report.pdf` would be accessible at `http://localhost:8080/direct/documents/report.pdf`.
+
+### Viewing in Browser
+Use `http://localhost:8080/raw/path_to_your/file.ext` to open a file in the browser instead of downloading it (supports seeking in video and audio).
 
 ### JSON File Listing
 You can get basic file/directory info using `http://localhost:8080/list/path_to_your/dir`.

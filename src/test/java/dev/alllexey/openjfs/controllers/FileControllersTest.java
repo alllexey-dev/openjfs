@@ -19,6 +19,7 @@ import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -46,6 +47,10 @@ class FileControllersTest {
         Files.writeString(dataDir.resolve("Мои документы/отчёт \"итог\".txt"), "0123456789");
         Files.createDirectory(dataDir.resolve(".git"));
         Files.writeString(dataDir.resolve(".git/credentials.txt"), "secret");
+        Files.createDirectory(dataDir.resolve("media"));
+        Files.writeString(dataDir.resolve("media/clip.mp4"), "0123456789");
+        Files.writeString(dataDir.resolve("media/page.html"), "<script>alert(1)</script>");
+        Files.writeString(dataDir.resolve("media/doc.pdf"), "%PDF-1.4");
     }
 
     @Test
@@ -90,6 +95,43 @@ class FileControllersTest {
         mockMvc.perform(get("/text/Мои документы/отчёт \"итог\".txt"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "text/plain;charset=UTF-8"));
+    }
+
+    @Test
+    void raw_servesInlineWithRealContentType() throws Exception {
+        mockMvc.perform(get("/raw/media/clip.mp4"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, startsWith("inline;")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void raw_supportsRangeRequests() throws Exception {
+        mockMvc.perform(get("/raw/media/clip.mp4").header(HttpHeaders.RANGE, "bytes=5-"))
+                .andExpect(status().isPartialContent())
+                .andExpect(content().string("56789"));
+    }
+
+    @Test
+    void raw_sandboxesActiveContent() throws Exception {
+        mockMvc.perform(get("/raw/media/page.html"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", "sandbox"));
+    }
+
+    @Test
+    void raw_doesNotSandboxPdf() throws Exception {
+        mockMvc.perform(get("/raw/media/doc.pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("application/pdf"))
+                .andExpect(header().doesNotExist("Content-Security-Policy"));
+    }
+
+    @Test
+    void raw_rejectsDirectories() throws Exception {
+        mockMvc.perform(get("/raw/media"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -18,6 +18,7 @@ public class WebController {
     public String web(Model model) {
         model.addAttribute("allowDownloadDirs", properties.isAllowZipDirectories());
         model.addAttribute("serverName", properties.getServerName());
+        model.addAttribute("searchMaxResults", properties.getSearchMaxResults());
         return "index";
     }
 

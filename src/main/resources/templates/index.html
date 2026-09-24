@@ -2,71 +2,111 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
     <title th:text="${serverName}"></title>
-
-    <link rel="preload" href="/fonts/poppins-v23-latin-regular.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/svg/arrow.svg" as="image">
-    <link rel="preload" href="/svg/download.svg" as="image">
-    <link rel="preload" href="/svg/link.svg" as="image">
-    <link rel="preload" href="/svg/folder.svg" as="image">
-    <link rel="preload" href="/svg/folder-empty.svg" as="image">
-    <link rel="preload" href="/svg/file-alt.svg" as="image">
-    <link rel="preload" href="/svg/file-audio.svg" as="image">
-    <link rel="preload" href="/svg/file-chart.svg" as="image">
-    <link rel="preload" href="/svg/file-code.svg" as="image">
-    <link rel="preload" href="/svg/file-exclamation.svg" as="image">
-    <link rel="preload" href="/svg/file-lock.svg" as="image">
-    <link rel="preload" href="/svg/file-pencil.svg" as="image">
-    <link rel="preload" href="/svg/file-question.svg" as="image">
-    <link rel="preload" href="/script.js" as="script">
     <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
-<div class="topbar">
-    <div class="topbar-path">
-        <a href="/ui" class="server-name" th:text="${serverName}"></a>
+<header class="header">
+    <div class="header-inner">
+        <a href="/ui" class="brand" data-path="" th:text="${serverName}"></a>
+        <label class="search">
+            <span class="search-icon" data-icon="search"></span>
+            <input type="search" class="search-input" placeholder="Search" autocomplete="off" spellcheck="false"
+                   enterkeyhint="search" aria-label="Search in this folder">
+            <kbd class="search-hint">/</kbd>
+        </label>
     </div>
-    <div class="topbar-right">
-        <button onclick="handleTopbarDownload()" class="topbar-download">
-            <img src="/svg/download.svg" alt="download" class="topbar-icon"/>
-        </button>
-        <button onclick="handleTopbarLink()">
-            <img src="/svg/link.svg" alt="link" class="topbar-icon"/>
-        </button>
-    </div>
-</div>
+</header>
 
-<div class="content-wrapper">
-    <div class="file-list-wrapper">
-        <div class="file-list-header">
-            <div class="col name">Name</div>
-            <div class="col modified">Last modified</div>
-            <div class="col size">Size</div>
-            <div class="col actions"></div>
+<main class="main">
+    <div class="toolbar">
+        <nav class="breadcrumbs" aria-label="Path"></nav>
+        <div class="toolbar-actions">
+            <button type="button" class="icon-button" data-action="download-current" title="Download">
+                <span data-icon="download"></span>
+            </button>
+            <button type="button" class="icon-button" data-action="share-current" title="Share link">
+                <span data-icon="link"></span>
+            </button>
         </div>
-
-        <div class="file-list"></div>
     </div>
 
-    <div class="file-content-wrapper hidden">
-        <div class="file-content-title"></div>
-        <textarea readonly class="file-content hidden"></textarea>
+    <section class="browser">
+        <div class="list-summary">
+            <span class="summary-text"></span>
+            <label class="sort-select">
+                <span data-icon="sort"></span>
+                <select aria-label="Sort by">
+                    <option value="name:1">Name A–Z</option>
+                    <option value="name:-1">Name Z–A</option>
+                    <option value="modified:-1">Newest first</option>
+                    <option value="modified:1">Oldest first</option>
+                    <option value="size:-1">Largest first</option>
+                    <option value="size:1">Smallest first</option>
+                </select>
+            </label>
+        </div>
+        <div class="list-header">
+            <span></span>
+            <button type="button" data-sort="name">Name</button>
+            <button type="button" data-sort="modified">Modified</button>
+            <button type="button" data-sort="size">Size</button>
+            <span></span>
+        </div>
+        <div class="list" role="list"></div>
+    </section>
+
+    <section class="viewer hidden">
+        <div class="viewer-head">
+            <span class="viewer-icon"></span>
+            <div class="viewer-title">
+                <h1 class="viewer-name"></h1>
+                <div class="viewer-meta"></div>
+            </div>
+            <div class="viewer-actions">
+                <button type="button" class="button primary" data-action="download-current">
+                    <span data-icon="download"></span><span>Download</span>
+                </button>
+                <button type="button" class="button" data-action="share-current">
+                    <span data-icon="link"></span><span>Share</span>
+                </button>
+            </div>
+        </div>
+        <div class="viewer-body"></div>
+    </section>
+
+    <div class="state hidden">
+        <span class="state-icon"></span>
+        <div class="state-title"></div>
+        <div class="state-text"></div>
     </div>
-</div>
+</main>
+
+<dialog class="sheet">
+    <div class="sheet-head">
+        <span class="sheet-icon"></span>
+        <div class="sheet-title"></div>
+    </div>
+    <div class="sheet-actions">
+        <button type="button" data-sheet-action="open"><span data-icon="open"></span><span>Open</span></button>
+        <button type="button" data-sheet-action="download"><span data-icon="download"></span><span>Download</span></button>
+        <button type="button" data-sheet-action="share"><span data-icon="link"></span><span>Share link</span></button>
+    </div>
+    <button type="button" class="sheet-cancel" data-sheet-action="close">Cancel</button>
+</dialog>
+
+<div class="toast" role="status" aria-live="polite"></div>
 
 <script th:inline="javascript">
-    const allowDownloadDirs = /*[[${allowDownloadDirs}]]*/ false;
-
-    function handleTopbarLink() {
-        navigator.clipboard.writeText(window.location);
-    }
-
-    function handleTopbarDownload() {
-        let topbarDownload = document.querySelector('.topbar-download');
-        if (!topbarDownload.classList.contains('unavailable')) {
-            window.location = window.location.origin + '/direct/' + window.location.pathname.substring(4);
-        }
-    }
+    window.OPENJFS = {
+        allowDownloadDirs: /*[[${allowDownloadDirs}]]*/ false,
+        searchMaxResults: /*[[${searchMaxResults}]]*/ 1000,
+        serverName: /*[[${serverName}]]*/ 'openjfs'
+    };
 </script>
 <script src="/script.js"></script>
 </body>
