@@ -51,6 +51,8 @@ class FileControllersTest {
         Files.writeString(dataDir.resolve("media/clip.mp4"), "0123456789");
         Files.writeString(dataDir.resolve("media/page.html"), "<script>alert(1)</script>");
         Files.writeString(dataDir.resolve("media/doc.pdf"), "%PDF-1.4");
+        Files.writeString(dataDir.resolve("media/README.md"), "# Media\n\n<b>raw</b>");
+        Files.writeString(dataDir.resolve("media/фото заката.png"), "png");
     }
 
     @Test
@@ -132,6 +134,42 @@ class FileControllersTest {
     void raw_rejectsDirectories() throws Exception {
         mockMvc.perform(get("/raw/media"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void markdown_rendersEscapedHtml() throws Exception {
+        mockMvc.perform(get("/markdown/media/README.md"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/html;charset=UTF-8"))
+                .andExpect(content().string(containsString("<h1>Media</h1>")))
+                .andExpect(content().string(containsString("&lt;b&gt;raw&lt;/b&gt;")));
+    }
+
+    @Test
+    void markdown_hidesHiddenFiles() throws Exception {
+        mockMvc.perform(get("/markdown/.git/credentials.txt"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void ui_containsLinkPreviewTags() throws Exception {
+        mockMvc.perform(get("/ui/media/фото заката.png")
+                        .header("X-Forwarded-Proto", "https")
+                        .header("X-Forwarded-Host", "files.example.com"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:title\" content=\"фото заката.png\">")))
+                .andExpect(content().string(containsString(
+                        "<meta property=\"og:image\" content=\"https://files.example.com/raw/media/"
+                                + "%D1%84%D0%BE%D1%82%D0%BE%20%D0%B7%D0%B0%D0%BA%D0%B0%D1%82%D0%B0.png\">")));
+    }
+
+    @Test
+    void ui_doesNotPreviewHiddenFiles() throws Exception {
+        mockMvc.perform(get("/ui/.git/credentials.txt"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<meta property=\"og:title\" content=\"openjfs\">")))
+                .andExpect(content().string(containsString("<meta property=\"og:description\" content=\"File server\">")));
     }
 
     @Test

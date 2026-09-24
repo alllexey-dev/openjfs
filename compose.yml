@@ -1,0 +1,10 @@
+services:
+  openjfs:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data:ro
+    environment:
+      - OPENJFS_SERVER_NAME=openjfs

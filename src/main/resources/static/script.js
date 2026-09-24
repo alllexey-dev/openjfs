@@ -3,6 +3,7 @@
 const config = window.OPENJFS;
 
 const TEXT_PREVIEW_LIMIT = 512 * 1024;
+const README_NAME = 'readme.md';
 const SEARCH_DEBOUNCE_MS = 250;
 const SORT_STORAGE_KEY = 'openjfs.sort';
 const DEFAULT_SORT_DIRECTIONS = {name: 1, modified: -1, size: -1};
@@ -22,6 +23,9 @@ const el = {
     viewerName: document.querySelector('.viewer-name'),
     viewerMeta: document.querySelector('.viewer-meta'),
     viewerBody: document.querySelector('.viewer-body'),
+    readme: document.querySelector('.readme'),
+    readmeName: document.querySelector('.readme-name'),
+    readmeBody: document.querySelector('.readme-body'),
     state: document.querySelector('.state'),
     sheet: document.querySelector('.sheet'),
     sheetIcon: document.querySelector('.sheet-icon'),
@@ -65,6 +69,7 @@ const ICONS = {
     arrowDown: '<path d="M12 5v14M6 13l6 6 6-6"/>',
     alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
 };
 
 function icon(name) {
@@ -230,8 +235,10 @@ function render() {
         el.browser.classList.remove('hidden');
         el.viewerBody.replaceChildren();
         renderList();
+        renderReadme();
     } else {
         el.browser.classList.add('hidden');
+        el.readme.classList.add('hidden');
         el.viewer.classList.remove('hidden');
         renderViewer(item);
     }
@@ -392,6 +399,7 @@ function renderError(error) {
     renderBreadcrumbs();
     el.browser.classList.add('hidden');
     el.viewer.classList.add('hidden');
+    el.readme.classList.add('hidden');
     el.viewerBody.replaceChildren();
     el.toolbarActions.classList.add('hidden');
     el.state.classList.remove('hidden');
@@ -404,6 +412,58 @@ function renderError(error) {
         const details = error.status ? `The server responded with ${error.status}.` : 'Check your connection and try again.';
         fillState(el.state, 'alert', 'Something went wrong', details);
     }
+}
+
+// ---------- markdown ----------
+
+function renderReadme() {
+    const readme = state.results === null
+        ? (state.item.files ?? []).find((file) => !isDirectory(file) && file.name.toLowerCase() === README_NAME)
+        : null;
+    el.readme.classList.add('hidden');
+    el.readmeBody.replaceChildren();
+    if (!readme || readme.size > TEXT_PREVIEW_LIMIT) return;
+
+    const request = state.request;
+    fetchMarkdown(readme, request.signal)
+        .then((html) => {
+            if (state.request !== request) return;
+            el.readmeName.textContent = readme.name;
+            setMarkdown(el.readmeBody, html, state.path);
+            el.readme.classList.remove('hidden');
+        })
+        .catch(() => {
+            // the folder is still usable without its readme
+        });
+}
+
+async function fetchMarkdown(file, signal) {
+    const response = await fetchResponse('/markdown/' + encodePath(fullPathOf(file)), signal);
+    return response.text();
+}
+
+// html is rendered by the server with raw html escaped, so it is safe to insert
+function setMarkdown(container, html, folderPath) {
+    container.innerHTML = html;
+    const folderUrl = folderPath ? encodePath(folderPath) + '/' : '';
+    const rawBase = `${location.origin}/raw/${folderUrl}`;
+    const uiBase = `${location.origin}/ui/${folderUrl}`;
+
+    // relative links in markdown point to files next to it
+    container.querySelectorAll('img[src]').forEach((image) => {
+        image.src = new URL(image.getAttribute('src'), rawBase).href;
+        image.loading = 'lazy';
+    });
+    container.querySelectorAll('a[href]').forEach((link) => {
+        const href = link.getAttribute('href');
+        if (href.startsWith('#')) return;
+        const url = new URL(href, uiBase);
+        link.href = url.href;
+        if (url.origin !== location.origin) {
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        }
+    });
 }
 
 // ---------- sorting ----------
@@ -485,9 +545,8 @@ function createPreview(file, kind) {
         return frame;
     }
     if (kind === 'text' || kind === 'code') {
-        return file.size <= TEXT_PREVIEW_LIMIT
-            ? createTextPreview(file)
-            : previewPlaceholder(file, 'This file is too large to preview.');
+        if (file.size > TEXT_PREVIEW_LIMIT) return previewPlaceholder(file, 'This file is too large to preview.');
+        return fileExtension(file.name) === 'md' ? createMarkdownPreview(file) : createTextPreview(file);
     }
 
     const placeholder = previewPlaceholder(file, 'No preview available for this file type.');
@@ -511,6 +570,19 @@ function createTextPreview(file) {
             pre.replaceWith(previewPlaceholder(file, 'Failed to load the file contents.'));
         });
     return pre;
+}
+
+function createMarkdownPreview(file) {
+    const container = document.createElement('div');
+    container.className = 'markdown viewer-markdown';
+    container.textContent = 'Loading…';
+    fetchMarkdown(file, state.request?.signal)
+        .then((html) => setMarkdown(container, html, parentPathOf(fullPathOf(file))))
+        .catch((error) => {
+            if (error.name === 'AbortError') return;
+            container.replaceWith(previewPlaceholder(file, 'Failed to load the file contents.'));
+        });
+    return container;
 }
 
 function previewPlaceholder(file, message, ...extra) {
@@ -546,7 +618,17 @@ function download(file) {
 }
 
 function shareFile(file) {
-    share(location.origin + uiUrl(fullPathOf(file)), file.name);
+    share(location.origin + uiUrl(fullPathOf(file)), file.name || config.serverName);
+}
+
+// direct link works with wget/curl, for folders it downloads a zip
+async function copyDownloadLink(file) {
+    const url = location.origin + '/direct/' + encodePath(fullPathOf(file));
+    if (await copyText(url)) {
+        showToast('Download link copied');
+    } else {
+        window.prompt('Copy this link:', url);
+    }
 }
 
 async function share(url, title) {
@@ -597,14 +679,16 @@ function showToast(message) {
     toastTimer = setTimeout(() => el.toast.classList.remove('visible'), 2000);
 }
 
-function openSheet(file) {
+function openSheet(file, {current = false} = {}) {
     state.sheetFile = file;
     const kind = fileKind(file);
+    const downloadable = !isDirectory(file) || config.allowDownloadDirs;
     el.sheet.style.setProperty('--type-color', kindColor(kind));
     el.sheetIcon.replaceChildren(icon(kind));
-    el.sheetTitle.textContent = file.name;
-    el.sheet.querySelector('[data-sheet-action="download"]')
-        .classList.toggle('hidden', isDirectory(file) && !config.allowDownloadDirs);
+    el.sheetTitle.textContent = file.name || config.serverName;
+    el.sheet.querySelector('[data-sheet-action="open"]').classList.toggle('hidden', current);
+    el.sheet.querySelector('[data-sheet-action="download"]').classList.toggle('hidden', !downloadable);
+    el.sheet.querySelector('[data-sheet-action="copy-download"]').classList.toggle('hidden', !downloadable);
     el.sheet.showModal();
 }
 
@@ -614,6 +698,7 @@ function handleSheetAction(action) {
     if (action === 'open') navigate(fullPathOf(file));
     if (action === 'download') download(file);
     if (action === 'share') shareFile(file);
+    if (action === 'copy-download') copyDownloadLink(file);
 }
 
 // ---------- events ----------
@@ -634,7 +719,11 @@ document.querySelectorAll('[data-action="download-current"]').forEach((button) =
 });
 
 document.querySelectorAll('[data-action="share-current"]').forEach((button) => {
-    button.addEventListener('click', () => share(location.origin + uiUrl(state.path), state.item?.name || config.serverName));
+    button.addEventListener('click', () => shareFile(state.item));
+});
+
+document.querySelectorAll('[data-action="more-current"]').forEach((button) => {
+    button.addEventListener('click', () => openSheet(state.item, {current: true}));
 });
 
 el.listHeader.querySelectorAll('[data-sort]').forEach((button) => {

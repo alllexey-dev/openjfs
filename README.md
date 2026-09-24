@@ -10,7 +10,9 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 *   **Directory Download (as ZIP):** Download entire directories as a single ZIP archive.
 *   **Direct File Download:** Access and download individual files directly through a simple URL structure.
 *   **JSON File Lists and Search:** List or search your files (and get some basic data) using simple API.
-*   **Web UI:** Mobile-friendly file browser with search, sorting, dark theme and previews for images, video, audio, PDF and text files.
+*   **Web UI:** Mobile-friendly file browser with search, sorting, dark theme and previews for images, video, audio, PDF, text and Markdown files.
+*   **Folder README:** A `README.md` inside a folder is rendered below the file list.
+*   **Link Previews:** Shared links show the file name and size in Telegram, Discord and other messengers.
 
 ## Roadmap
 
@@ -19,7 +21,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 *   [ ] **File Indexing** *(maybe)*
 *   [x] **Web UI** 
 *   [ ] **Admin Panel**
-*   [x] **Docker Support** *(it's very easy to run via docker, so mark as done)*
+*   [x] **Docker Support**
 *   [ ] **Advanced Exception Logging**
 
 ## Getting Started
@@ -28,6 +30,16 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 
 *   JDK 21 or higher
 *   Apache Maven
+
+### Running with Docker
+
+Put your files into `./data` next to `compose.yml` (or change the volume) and run:
+
+```bash
+docker compose up -d --build
+```
+
+The server is available at `http://localhost:8080`. To update, pull the new sources and run the same command again.
 
 ### Installation and Execution
 

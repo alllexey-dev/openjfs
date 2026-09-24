@@ -6,7 +6,15 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
-    <title th:text="${serverName}"></title>
+    <title th:text="${preview.pageTitle}"></title>
+    <meta name="description" th:content="${preview.description}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" th:content="${serverName}">
+    <meta property="og:title" th:content="${preview.title}">
+    <meta property="og:description" th:content="${preview.description}">
+    <meta property="og:url" th:content="${previewUrl}">
+    <meta property="og:image" th:if="${previewImageUrl}" th:content="${previewImageUrl}">
+    <meta name="twitter:card" th:content="${previewImageUrl != null ? 'summary_large_image' : 'summary'}">
     <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
@@ -31,6 +39,9 @@
             </button>
             <button type="button" class="icon-button" data-action="share-current" title="Share link">
                 <span data-icon="link"></span>
+            </button>
+            <button type="button" class="icon-button" data-action="more-current" title="More actions">
+                <span data-icon="more"></span>
             </button>
         </div>
     </div>
@@ -60,6 +71,14 @@
         <div class="list" role="list"></div>
     </section>
 
+    <section class="readme hidden">
+        <div class="readme-head">
+            <span data-icon="text"></span>
+            <span class="readme-name"></span>
+        </div>
+        <div class="readme-body markdown"></div>
+    </section>
+
     <section class="viewer hidden">
         <div class="viewer-head">
             <span class="viewer-icon"></span>
@@ -73,6 +92,10 @@
                 </button>
                 <button type="button" class="button" data-action="share-current">
                     <span data-icon="link"></span><span>Share</span>
+                </button>
+                <button type="button" class="button icon-only" data-action="more-current" title="More actions"
+                        aria-label="More actions">
+                    <span data-icon="more"></span>
                 </button>
             </div>
         </div>
@@ -95,6 +118,9 @@
         <button type="button" data-sheet-action="open"><span data-icon="open"></span><span>Open</span></button>
         <button type="button" data-sheet-action="download"><span data-icon="download"></span><span>Download</span></button>
         <button type="button" data-sheet-action="share"><span data-icon="link"></span><span>Share link</span></button>
+        <button type="button" data-sheet-action="copy-download">
+            <span data-icon="copy"></span><span>Copy download link</span>
+        </button>
     </div>
     <button type="button" class="sheet-cancel" data-sheet-action="close">Cancel</button>
 </dialog>
