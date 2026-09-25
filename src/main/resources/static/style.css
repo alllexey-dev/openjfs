@@ -24,6 +24,7 @@
     --c-pdf: #dc2626;
     --c-text: #64748b;
     --c-other: #94a3b8;
+    --danger: #dc2626;
 
     --radius: 12px;
     --header-height: 60px;
@@ -57,6 +58,7 @@
         --c-pdf: #f87171;
         --c-text: #94a3b8;
         --c-other: #6b7280;
+        --danger: #f87171;
     }
 }
 
@@ -885,6 +887,377 @@ a {
     transform: translate(-50%, 0);
 }
 
+/* ---------- admin ---------- */
+
+body:not(.is-admin) .admin-only {
+    display: none !important;
+}
+
+.account-button {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 40px;
+    gap: 6px;
+    padding: 0 8px;
+}
+
+.account-button .account-label {
+    display: none;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.account-button.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.upload-button {
+    display: none;
+    height: 36px;
+    padding: 0 14px;
+    margin-right: 4px;
+}
+
+.private-badge {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-left: 6px;
+    color: var(--text-muted);
+}
+
+.private-badge .icon {
+    width: 14px;
+    height: 14px;
+}
+
+.sheet-admin {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+.sheet-actions button.danger {
+    color: var(--danger);
+}
+
+.fab {
+    position: fixed;
+    right: 16px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    z-index: 30;
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: var(--accent-text);
+    box-shadow: var(--shadow-lg);
+}
+
+/* keeps the last rows reachable under the floating upload button */
+.is-admin .main {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.fab .icon {
+    width: 24px;
+    height: 24px;
+}
+
+/* ---------- modal ---------- */
+
+.modal {
+    width: calc(100% - 24px);
+    max-width: 440px;
+    max-height: calc(100vh - 48px);
+    padding: 0;
+    border: none;
+    border-radius: 16px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+}
+
+.modal::backdrop {
+    background: var(--backdrop);
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 48px);
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 8px 4px 20px;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 8px 20px;
+    overflow-y: auto;
+}
+
+.modal-text {
+    margin: 0 0 8px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.modal-error {
+    margin: 4px 20px 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
+    font-size: 14px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 16px;
+}
+
+.modal-actions .button {
+    height: 40px;
+}
+
+.button.danger,
+.button.primary.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.field-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.field input {
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    font-size: 16px;
+    outline: none;
+}
+
+.field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.menu-button {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+.menu-button:hover {
+    background: var(--surface-hover);
+}
+
+/* ---------- trash ---------- */
+
+.trash-row {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.trash-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trash-actions {
+    display: flex;
+    gap: 2px;
+}
+
+.armed-button.armed {
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.icon-button.armed-button.armed {
+    width: auto;
+    padding: 0 10px;
+    gap: 6px;
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.trash-empty {
+    width: 100%;
+    height: 44px;
+    margin-top: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.trash-list .state {
+    padding: 24px 0;
+}
+
+/* ---------- uploads ---------- */
+
+.uploads {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    z-index: 40;
+    max-height: 45vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.uploads-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 4px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.uploads-list {
+    overflow-y: auto;
+}
+
+.upload-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px 8px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.upload-item:last-child {
+    border-bottom: none;
+}
+
+.upload-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.upload-name {
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-status {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.upload-item[data-status="failed"] .upload-status {
+    color: var(--danger);
+}
+
+.progress {
+    height: 4px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--surface-active);
+    overflow: hidden;
+}
+
+.progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s;
+}
+
+.upload-item[data-status="done"] .progress-bar {
+    background: var(--c-image);
+}
+
+.upload-item[data-status="failed"] .progress-bar,
+.upload-item[data-status="cancelled"] .progress-bar,
+.upload-item[data-status="skipped"] .progress-bar {
+    background: var(--text-muted);
+}
+
+.drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+.drop-overlay-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 40px;
+    border: 2px dashed var(--accent);
+    border-radius: 20px;
+    background: var(--surface);
+    color: var(--accent);
+    font-weight: 600;
+    text-align: center;
+}
+
+.drop-overlay-inner .icon {
+    width: 36px;
+    height: 36px;
+}
+
 /* ---------- desktop ---------- */
 
 @media (min-width: 720px) {
@@ -904,6 +1277,33 @@ a {
 
     .search-hint {
         display: inline;
+    }
+
+    .account-button .account-label {
+        display: inline;
+    }
+
+    .account-button:not(.active) .account-label {
+        display: none;
+    }
+
+    .upload-button {
+        display: inline-flex;
+    }
+
+    .fab {
+        display: none;
+    }
+
+    .is-admin .main {
+        padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    }
+
+    .uploads {
+        left: auto;
+        right: 24px;
+        bottom: 24px;
+        width: 380px;
     }
 
     .search:focus-within .search-hint {

@@ -31,7 +31,14 @@ public class MainConfigurationProperties {
 
     private String serverName;
 
+    // admin mode (uploads, file management, private folders) is enabled only when the password is set
+    private String adminPassword;
+
     public Path getDataPathAsPath() {
         return Path.of(dataPath).toAbsolutePath().normalize();
+    }
+
+    public boolean isAdminEnabled() {
+        return adminPassword != null && !adminPassword.isBlank();
     }
 }

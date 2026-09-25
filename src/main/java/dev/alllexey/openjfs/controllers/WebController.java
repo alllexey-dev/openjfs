@@ -3,6 +3,7 @@ package dev.alllexey.openjfs.controllers;
 import lombok.RequiredArgsConstructor;
 import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import dev.alllexey.openjfs.model.LinkPreview;
+import dev.alllexey.openjfs.security.CurrentUser;
 import dev.alllexey.openjfs.services.LinkPreviewService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,11 +21,15 @@ public class WebController {
 
     private final LinkPreviewService linkPreviewService;
 
+    private final CurrentUser currentUser;
+
     @GetMapping("/{*path}")
     public String web(@PathVariable String path, Model model) {
         model.addAttribute("allowDownloadDirs", properties.isAllowZipDirectories());
         model.addAttribute("serverName", properties.getServerName());
         model.addAttribute("searchMaxResults", properties.getSearchMaxResults());
+        model.addAttribute("adminEnabled", properties.isAdminEnabled());
+        model.addAttribute("admin", currentUser.isAdmin());
 
         LinkPreview preview = linkPreviewService.preview(path);
         model.addAttribute("preview", preview);

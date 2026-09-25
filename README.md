@@ -13,6 +13,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 *   **Web UI:** Mobile-friendly file browser with search, sorting, dark theme and previews for images, video, audio, PDF, text and Markdown files.
 *   **Folder README:** A `README.md` inside a folder is rendered below the file list.
 *   **Link Previews:** Shared links show the file name and size in Telegram, Discord and other messengers.
+*   **Admin Mode:** Upload files, create, rename and move folders, trash with restore and private folders (see below).
 
 ## Roadmap
 
@@ -20,7 +21,7 @@ A simple, open-source **Java Spring Boot** application designed to serve static 
 *   [x] **File Search API**
 *   [ ] **File Indexing** *(maybe)*
 *   [x] **Web UI** 
-*   [ ] **Admin Panel**
+*   [x] **Admin Panel**
 *   [x] **Docker Support**
 *   [ ] **Advanced Exception Logging**
 
@@ -127,6 +128,23 @@ Example response:
 ]
 ```
 
+## Admin Mode
+
+Set `OPENJFS_ADMIN_PASSWORD` to enable it. Log in with the user icon in the top right corner of the web UI. The admin can:
+
+*   upload files (button, or drag and drop onto the page), create folders, rename and move files and folders;
+*   move files and folders to the trash, then restore them or delete them forever (admin menu → Trash);
+*   make folders private: a private folder and everything in it is visible only to the logged in admin. A folder is private when it contains an empty `.private` file, so it can also be set up over SSH.
+
+Without the password the server is read-only. Service files (`.trash`, `.private`, unfinished uploads) are never served. The server must be able to write to the data directory, so run the container as the owner of the files (see `user` in `compose.yml`).
+
+When running behind a reverse proxy, raise its request body limit, otherwise large uploads fail. For nginx:
+
+```nginx
+client_max_body_size 0;
+proxy_request_buffering off;
+```
+
 ## Configuration
 
 The file server is configured through environment variables.
@@ -140,5 +158,7 @@ The file server is configured through environment variables.
 | `OPENJFS_ZIP_COMPRESSION_LEVEL` | The compression level for ZIP archives, from 0 (no compression) to 9 (max). | `1`               |
 | `OPENJFS_SEARCH_MAX_RESULTS`    | The maximum number of search results.                                       | `1000`            |
 | `OPENJFS_WORKER_THREADS`        | The number of worker threads (limits simultaneous file downloads).          | `200`             |
+| `OPENJFS_ADMIN_PASSWORD`        | Enables admin mode with this password (see Admin Mode).                     | *(disabled)*      |
+| `OPENJFS_SECURE_COOKIES`        | Set to `false` if the server is used over plain HTTP (not localhost).       | `true`            |
 | `OPENJFS_SERVER_NAME`           | The server name to use as page title.                                       | `openjfs`         |
 

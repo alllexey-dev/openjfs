@@ -27,6 +27,9 @@
                    enterkeyhint="search" aria-label="Search in this folder">
             <kbd class="search-hint">/</kbd>
         </label>
+        <button type="button" class="icon-button account-button hidden" data-action="account" title="Admin">
+            <span data-icon="user"></span><span class="account-label">Admin</span>
+        </button>
     </div>
 </header>
 
@@ -34,6 +37,9 @@
     <div class="toolbar">
         <nav class="breadcrumbs" aria-label="Path"></nav>
         <div class="toolbar-actions">
+            <button type="button" class="button primary upload-button admin-only" data-action="upload">
+                <span data-icon="upload"></span><span>Upload</span>
+            </button>
             <button type="button" class="icon-button" data-action="download-current" title="Download">
                 <span data-icon="download"></span>
             </button>
@@ -121,9 +127,61 @@
         <button type="button" data-sheet-action="copy-download">
             <span data-icon="copy"></span><span>Copy download link</span>
         </button>
+        <div class="sheet-admin admin-only">
+            <button type="button" data-sheet-action="new-folder">
+                <span data-icon="folderPlus"></span><span>New folder</span>
+            </button>
+            <button type="button" data-sheet-action="rename"><span data-icon="pencil"></span><span>Rename</span></button>
+            <button type="button" data-sheet-action="move"><span data-icon="move"></span><span>Move</span></button>
+            <button type="button" data-sheet-action="privacy">
+                <span data-icon="lock"></span><span class="privacy-label">Make private</span>
+            </button>
+            <button type="button" class="danger" data-sheet-action="delete">
+                <span data-icon="trash"></span><span>Move to trash</span>
+            </button>
+        </div>
     </div>
     <button type="button" class="sheet-cancel" data-sheet-action="close">Cancel</button>
 </dialog>
+
+<dialog class="modal">
+    <form method="dialog" class="modal-form">
+        <div class="modal-head">
+            <h2 class="modal-title"></h2>
+            <button type="button" class="icon-button" data-modal-close title="Close" aria-label="Close">
+                <span data-icon="close"></span>
+            </button>
+        </div>
+        <div class="modal-body"></div>
+        <div class="modal-error hidden" role="alert"></div>
+        <div class="modal-actions">
+            <button type="button" class="button" data-modal-close>Cancel</button>
+            <button type="submit" class="button primary modal-submit">OK</button>
+        </div>
+    </form>
+</dialog>
+
+<button type="button" class="fab admin-only" data-action="upload" title="Upload files" aria-label="Upload files">
+    <span data-icon="upload"></span>
+</button>
+<input type="file" class="upload-input" multiple hidden>
+
+<div class="drop-overlay hidden">
+    <div class="drop-overlay-inner">
+        <span data-icon="upload"></span>
+        <div class="drop-overlay-text"></div>
+    </div>
+</div>
+
+<div class="uploads hidden" role="status">
+    <div class="uploads-head">
+        <span class="uploads-title"></span>
+        <button type="button" class="icon-button" data-action="close-uploads" title="Hide" aria-label="Hide">
+            <span data-icon="close"></span>
+        </button>
+    </div>
+    <div class="uploads-list"></div>
+</div>
 
 <div class="toast" role="status" aria-live="polite"></div>
 
@@ -131,9 +189,12 @@
     window.OPENJFS = {
         allowDownloadDirs: /*[[${allowDownloadDirs}]]*/ false,
         searchMaxResults: /*[[${searchMaxResults}]]*/ 1000,
-        serverName: /*[[${serverName}]]*/ 'openjfs'
+        serverName: /*[[${serverName}]]*/ 'openjfs',
+        adminEnabled: /*[[${adminEnabled}]]*/ false,
+        admin: /*[[${admin}]]*/ false
     };
 </script>
 <script src="/script.js"></script>
+<script th:if="${adminEnabled}" src="/admin.js"></script>
 </body>
 </html>

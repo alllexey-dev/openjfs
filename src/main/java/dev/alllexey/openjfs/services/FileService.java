@@ -5,6 +5,7 @@ import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import dev.alllexey.openjfs.model.DirectoryInfo;
 import dev.alllexey.openjfs.model.FileInfo;
 import dev.alllexey.openjfs.model.RegularFileInfo;
+import dev.alllexey.openjfs.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,19 @@ public class FileService {
     // follow symlinks (loops are detected by walkFileTree), but never leave the data dir, see isAccessibleChild
     private static final Set<FileVisitOption> WALK_OPTIONS = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
 
+    // a folder containing this marker file is visible only to the admin
+    public static final String PRIVATE_MARKER = ".private";
+
+    public static final String TRASH_DIR = ".trash";
+
+    // prefix of temporary files created during uploads
+    public static final String TEMP_PREFIX = ".openjfs-";
+
+    private static final Set<String> RESERVED_NAMES = Set.of(PRIVATE_MARKER, TRASH_DIR);
+
     private final MainConfigurationProperties properties;
+
+    private final CurrentUser currentUser;
 
     public Path resolveRequestedPath(String requestedPath) {
         if (requestedPath.startsWith("/")) {
@@ -66,8 +79,12 @@ public class FileService {
         if (!Files.exists(fullPath)) return HttpStatus.NOT_FOUND;
         // 404 if hidden or in hidden dir (and hidden files are disabled)
         if (isHidden(fullPath) && !properties.isAllowHidden()) return HttpStatus.NOT_FOUND;
+        // 404 for service files (trash, private markers, unfinished uploads), even for the admin
+        if (containsReservedSegment(fullPath)) return HttpStatus.NOT_FOUND;
         // 403 if it is (or is inside) a symlink pointing outside our data dir
         if (!isRealPathInsideDataDir(fullPath)) return HttpStatus.FORBIDDEN;
+        // 404 if it is (or is inside) a private folder, existence of private files is not revealed
+        if (!currentUser.isAdmin() && isInPrivateFolder(fullPath)) return HttpStatus.NOT_FOUND;
         return HttpStatus.OK;
     }
 
@@ -98,10 +115,54 @@ public class FileService {
         return filePath.getFileName().toString().startsWith(".");
     }
 
+    public boolean isReservedName(Path filePath) {
+        String name = filePath.getFileName().toString();
+        return RESERVED_NAMES.contains(name) || name.startsWith(TEMP_PREFIX);
+    }
+
+    private boolean containsReservedSegment(Path fullPath) {
+        for (Path segment : properties.getDataPathAsPath().relativize(fullPath)) {
+            if (!segment.toString().isEmpty() && isReservedName(segment)) return true;
+        }
+        return false;
+    }
+
+    public boolean isPrivateFolder(Path dir) {
+        return Files.exists(dir.resolve(PRIVATE_MARKER));
+    }
+
+    // checks both the requested path and the real one, so a symlink can't expose a private folder
+    public boolean isInPrivateFolder(Path fullPath) {
+        Path root = properties.getDataPathAsPath();
+        if (hasPrivateAncestor(fullPath, root)) return true;
+        try {
+            return hasPrivateAncestor(fullPath.toRealPath(), root.toRealPath());
+        } catch (IOException e) {
+            return true; // can't verify, so treat as private
+        }
+    }
+
+    private boolean hasPrivateAncestor(Path path, Path root) {
+        Path dir = Files.isDirectory(path) ? path : path.getParent();
+        while (dir != null && dir.startsWith(root)) {
+            if (isPrivateFolder(dir)) return true;
+            dir = dir.getParent();
+        }
+        return false;
+    }
+
     // check a direct child of an accessible directory (parent dirs are already checked)
     public boolean isAccessibleChild(Path path) {
+        if (isReservedName(path)) return false;
         if (isHiddenByName(path) && !properties.isAllowHidden()) return false;
-        return isRealPathInsideDataDir(path);
+        if (!isRealPathInsideDataDir(path)) return false;
+        return currentUser.isAdmin() || !isPrivateChild(path);
+    }
+
+    private boolean isPrivateChild(Path path) {
+        if (Files.isDirectory(path) && isPrivateFolder(path)) return true;
+        // a symlink may point into a private folder located elsewhere
+        return Files.isSymbolicLink(path) && isInPrivateFolder(path);
     }
 
     // assume file (directory) exists and is accessible (visible, not outside, etc.)
@@ -162,6 +223,7 @@ public class FileService {
                     .lastModified(lastModified)
                     .lastModifiedMillis(lastModifiedMillis)
                     .isEmpty(isEmpty)
+                    .isPrivate(isPrivateFolder(fullPath))
                     .files(depth >= 1 ? files : null)
                     .build();
         } else {

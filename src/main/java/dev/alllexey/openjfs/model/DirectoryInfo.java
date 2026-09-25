@@ -27,6 +27,8 @@ public class DirectoryInfo implements FileInfo {
 
     private boolean isEmpty;
 
+    private boolean isPrivate;
+
     @Builder.Default
     private List<FileInfo> files = new ArrayList<>();
 }

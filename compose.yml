@@ -2,9 +2,13 @@ services:
   openjfs:
     build: .
     restart: unless-stopped
+    # owner of the files in ./data, needed for uploads in admin mode
+    user: "1000:1000"
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/data:ro
+      - ./data:/data
     environment:
       - OPENJFS_SERVER_NAME=openjfs
+      # enables admin mode, keep the password in the .env file next to this one
+      - OPENJFS_ADMIN_PASSWORD=${OPENJFS_ADMIN_PASSWORD:-}

@@ -3,6 +3,7 @@ package dev.alllexey.openjfs.services;
 import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import dev.alllexey.openjfs.model.DirectoryInfo;
 import dev.alllexey.openjfs.model.FileInfo;
+import dev.alllexey.openjfs.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,6 +25,8 @@ import java.util.zip.ZipInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class FileServiceTest {
 
@@ -35,6 +38,8 @@ class FileServiceTest {
     private Path outsideDir;
 
     private MainConfigurationProperties properties;
+
+    private CurrentUser currentUser;
 
     private FileService fileService;
 
@@ -57,7 +62,8 @@ class FileServiceTest {
         properties.setAllowHidden(false);
         properties.setZipCompressionLevel(1);
         properties.setSearchMaxResults(1000);
-        fileService = new FileService(properties);
+        currentUser = mock(CurrentUser.class);
+        fileService = new FileService(properties, currentUser);
     }
 
     @Test
@@ -190,6 +196,84 @@ class FileServiceTest {
         }).get(10, TimeUnit.SECONDS);
 
         assertThat(entries).doesNotContain("pipe");
+    }
+
+    @Test
+    void checkAccess_hidesPrivateFolderFromVisitors() throws IOException {
+        Files.createFile(dataDir.resolve("docs/sub dir/.private"));
+
+        assertThat(fileService.checkAccess(dataDir.resolve("docs/sub dir"))).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(fileService.checkAccess(dataDir.resolve("docs/sub dir/report copy.txt")))
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void checkAccess_showsPrivateFolderToAdmin() throws IOException {
+        Files.createFile(dataDir.resolve("docs/sub dir/.private"));
+        when(currentUser.isAdmin()).thenReturn(true);
+
+        assertThat(fileService.checkAccess(dataDir.resolve("docs/sub dir/report copy.txt")))
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void checkAccess_hidesPrivateFolderReachedThroughSymlink() throws IOException {
+        Files.createFile(dataDir.resolve("docs/sub dir/.private"));
+        Files.createSymbolicLink(dataDir.resolve("shortcut"), dataDir.resolve("docs/sub dir"));
+
+        assertThat(fileService.checkAccess(dataDir.resolve("shortcut/report copy.txt")))
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void checkAccess_hidesServiceFilesEvenWhenHiddenFilesAllowed() throws IOException {
+        properties.setAllowHidden(true);
+        when(currentUser.isAdmin()).thenReturn(true);
+        Files.createDirectories(dataDir.resolve(".trash/1-abcdef12"));
+        Files.createFile(dataDir.resolve("docs/.private"));
+
+        assertThat(fileService.checkAccess(dataDir.resolve(".trash/1-abcdef12"))).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(fileService.checkAccess(dataDir.resolve("docs/.private"))).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void getFileInfo_skipsPrivateFoldersForVisitors() throws IOException {
+        Files.createFile(dataDir.resolve("docs/.private"));
+
+        DirectoryInfo root = (DirectoryInfo) fileService.getFileInfo(dataDir, 1);
+
+        assertThat(root.getFiles()).isEmpty(); // "docs" is private, "docs-link" points into it
+    }
+
+    @Test
+    void getFileInfo_marksPrivateFoldersForAdmin() throws IOException {
+        Files.createFile(dataDir.resolve("docs/.private"));
+        when(currentUser.isAdmin()).thenReturn(true);
+
+        DirectoryInfo root = (DirectoryInfo) fileService.getFileInfo(dataDir, 1);
+
+        assertThat(root.getFiles()).filteredOn(fi -> fi.getName().equals("docs"))
+                .singleElement()
+                .extracting(fi -> ((DirectoryInfo) fi).isPrivate())
+                .isEqualTo(true);
+    }
+
+    @Test
+    void simpleSearch_skipsPrivateFoldersForVisitors() throws IOException {
+        Files.createFile(dataDir.resolve("docs/sub dir/.private"));
+
+        List<FileInfo> result = fileService.simpleSearch(dataDir, "report");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void zipDirectory_skipsPrivateFoldersForVisitors() throws IOException {
+        Files.createFile(dataDir.resolve("docs/sub dir/.private"));
+
+        List<String> entries = zipEntries(dataDir.resolve("docs"));
+
+        assertThat(entries).containsExactly("отчёт.txt");
     }
 
     private List<String> zipEntries(Path dir) throws IOException {

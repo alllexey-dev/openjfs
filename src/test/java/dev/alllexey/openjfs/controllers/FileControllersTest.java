@@ -20,7 +20,9 @@ import java.util.zip.ZipInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -170,6 +172,16 @@ class FileControllersTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<meta property=\"og:title\" content=\"openjfs\">")))
                 .andExpect(content().string(containsString("<meta property=\"og:description\" content=\"File server\">")));
+    }
+
+    @Test
+    void login_isUnavailableWithoutAdminPassword() throws Exception {
+        mockMvc.perform(post("/api/login").with(csrf())
+                        .param("username", "admin")
+                        .param("password", ""))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/admin/trash"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

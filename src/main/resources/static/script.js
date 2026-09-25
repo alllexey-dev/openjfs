@@ -41,6 +41,7 @@ const state = {
     sort: loadSort(),
     request: null,
     sheetFile: null,
+    sheetCurrent: false,
 };
 
 // ---------- icons ----------
@@ -70,6 +71,15 @@ const ICONS = {
     alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    upload: '<path d="M12 16V5M7 9.5l5-5 5 5M5 20h14"/>',
+    folderPlus: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M12 10v6M9 13h6"/>',
+    pencil: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    move: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/><path d="M9 13h6M13 10.5l2.5 2.5-2.5 2.5"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+    restore: '<path d="M4 12a8 8 0 1 0 2.5-5.8L4 8.5"/><path d="M4 4v4.5h4.5"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/>',
+    logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h10"/>',
+    close: '<path d="M6 6l12 12M18 6 6 18"/>',
 };
 
 function icon(name) {
@@ -242,6 +252,7 @@ function render() {
         el.viewer.classList.remove('hidden');
         renderViewer(item);
     }
+    document.dispatchEvent(new CustomEvent('openjfs:render'));
 }
 
 function renderBreadcrumbs() {
@@ -278,7 +289,10 @@ function renderList() {
     const searching = state.results !== null;
     const files = [...(searching ? state.results : state.item.files ?? [])].sort(compareFiles);
 
-    el.summaryText.textContent = searching ? searchSummary(files.length) : folderSummary(files);
+    const summary = searching ? searchSummary(files.length) : folderSummary(files);
+    el.summaryText.textContent = !searching && state.item.private
+        ? ['Private folder', summary].filter(Boolean).join(' · ')
+        : summary;
     renderSortControls();
 
     const rows = files.map((file) => createRow(file, searching));
@@ -329,6 +343,13 @@ function createRow(file, searching) {
     link.dataset.path = path;
     link.textContent = file.name;
     link.title = file.name;
+    if (file.private) {
+        const badge = document.createElement('span');
+        badge.className = 'private-badge';
+        badge.title = 'Private folder: visible only to the admin';
+        badge.append(icon('lock'));
+        link.append(badge);
+    }
     main.append(link);
 
     if (searching) {
@@ -681,6 +702,7 @@ function showToast(message) {
 
 function openSheet(file, {current = false} = {}) {
     state.sheetFile = file;
+    state.sheetCurrent = current;
     const kind = fileKind(file);
     const downloadable = !isDirectory(file) || config.allowDownloadDirs;
     el.sheet.style.setProperty('--type-color', kindColor(kind));
@@ -689,6 +711,7 @@ function openSheet(file, {current = false} = {}) {
     el.sheet.querySelector('[data-sheet-action="open"]').classList.toggle('hidden', current);
     el.sheet.querySelector('[data-sheet-action="download"]').classList.toggle('hidden', !downloadable);
     el.sheet.querySelector('[data-sheet-action="copy-download"]').classList.toggle('hidden', !downloadable);
+    document.dispatchEvent(new CustomEvent('openjfs:sheet', {detail: {file, current}}));
     el.sheet.showModal();
 }
 
@@ -699,6 +722,9 @@ function handleSheetAction(action) {
     if (action === 'download') download(file);
     if (action === 'share') shareFile(file);
     if (action === 'copy-download') copyDownloadLink(file);
+    // other actions (admin ones) are handled by admin.js
+    document.dispatchEvent(new CustomEvent('openjfs:sheet-action',
+        {detail: {action, file, current: state.sheetCurrent}}));
 }
 
 // ---------- events ----------
@@ -787,6 +813,7 @@ window.addEventListener('popstate', () => {
     load(path, query);
 });
 
+document.body.classList.toggle('is-admin', config.admin);
 fillIcons(document);
 const initial = readLocation();
 load(initial.path, initial.query);

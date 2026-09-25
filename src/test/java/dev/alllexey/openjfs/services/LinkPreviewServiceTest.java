@@ -2,6 +2,7 @@ package dev.alllexey.openjfs.services;
 
 import dev.alllexey.openjfs.configuration.MainConfigurationProperties;
 import dev.alllexey.openjfs.model.LinkPreview;
+import dev.alllexey.openjfs.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class LinkPreviewServiceTest {
 
@@ -36,7 +38,8 @@ class LinkPreviewServiceTest {
         MainConfigurationProperties properties = new MainConfigurationProperties();
         properties.setDataPath(dataDir.toString());
         properties.setServerName("alllexey files");
-        linkPreviewService = new LinkPreviewService(properties, new FileService(properties));
+        linkPreviewService = new LinkPreviewService(properties,
+                new FileService(properties, mock(CurrentUser.class)));
     }
 
     @Test
